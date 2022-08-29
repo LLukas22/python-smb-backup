@@ -13,7 +13,7 @@ class SMB_Backup(object):
         self._password = password
         self._temp_dir = os.path.abspath(temp_dir) 
         self._retention = retention
-        smbclient.ClientConfig(username=self._username, password='r7UG~]')
+        smbclient.ClientConfig(username=self._username, password=self._password)
     
     @property
     def _connection_url(self)->str:
@@ -31,10 +31,12 @@ class SMB_Backup(object):
         if not os.path.isdir(source_dir):
             return False
         
+        #clear the tempdir 
         if os.path.isdir(self._temp_dir):
             shutil.rmtree(self._temp_dir)
         os.makedirs(self._temp_dir)
-            
+         
+        #create the tar file     
         now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         try:
             archive,path = self._create_tar_file(now,source_dir)
@@ -42,6 +44,7 @@ class SMB_Backup(object):
             logging.exception("Failed to create archive!")
             return False
         
+        #upload to the smb drive
         try:
             smbclient.makedirs(f'{self._connection_url}\\{dest_dir}',exist_ok=True)
             with smbclient.open_file(f'{self._connection_url}\\{dest_dir}\\{archive}', mode="xb") as target:
@@ -55,6 +58,7 @@ class SMB_Backup(object):
             logging.exception("Failed to upload archive to SMB!")
             return False
         
+        #delete old  backups if necessary
         if self._retention and self._retention > 0:
             try:
                 existing_backups = smbclient.listdir(f'{self._connection_url}\\{dest_dir}')
@@ -69,7 +73,3 @@ class SMB_Backup(object):
                 return False
             
         return True
-                  
-if __name__ == "__main__":
-    smb_backup = SMB_Backup("192.168.188.20","DB_Backups","BackUp","r7UG~]",retention=6)
-    smb_backup.backup("test","test")
